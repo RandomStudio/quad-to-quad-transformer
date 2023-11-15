@@ -20,20 +20,20 @@ clockwise: 'left top', 'right top', 'right bottom', 'left bottom',
  */
 pub type RectCorners = [Point2D; 4];
 type Matrix8x8 = na::SMatrix<f32, 8, 8>;
-pub struct PerspectiveTransformer {
+pub struct QuadTransformer {
     transform_matrix: Option<Matrix3<f32>>,
     ignore_outside_margin: Option<f32>,
 }
 
-impl PerspectiveTransformer {
+impl QuadTransformer {
     pub fn new(
         src_quad: Option<RectCorners>,
         ignore_outside_margin: Option<f32>,
-    ) -> PerspectiveTransformer {
+    ) -> QuadTransformer {
         if ignore_outside_margin.is_none() {
             warn!("perspectiveTransform.includeOutside was enabled; points will not be restricted to src_quad");
         }
-        PerspectiveTransformer {
+        QuadTransformer {
             transform_matrix: src_quad.map(|quad| build_transform(&quad.clone(), &DST_QUAD)),
             ignore_outside_margin,
         }
