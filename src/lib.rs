@@ -8,7 +8,7 @@ extern crate nalgebra as na;
 
 // A standardised "1x1" box to transform all coordinates into
 const DST_SIZE: f32 = 1.;
-const DST_QUAD: RectCorners = [
+pub const DEFAULT_DST_QUAD: RectCorners = [
     (0., 0.),
     (DST_SIZE, 0.),
     (DST_SIZE, DST_SIZE),
@@ -34,13 +34,14 @@ impl QuadTransformer {
             warn!("perspectiveTransform.includeOutside was enabled; points will not be restricted to src_quad");
         }
         QuadTransformer {
-            transform_matrix: src_quad.map(|quad| build_transform(&quad.clone(), &DST_QUAD)),
+            transform_matrix: src_quad
+                .map(|quad| build_transform(&quad.clone(), &DEFAULT_DST_QUAD)),
             ignore_outside_margin,
         }
     }
 
     pub fn set_new_quad(&mut self, src_quad: &RectCorners) {
-        self.transform_matrix = Some(build_transform(src_quad, &DST_QUAD));
+        self.transform_matrix = Some(build_transform(src_quad, &DEFAULT_DST_QUAD));
     }
 
     pub fn transform(&self, point: &Point2D) -> anyhow::Result<Point2D> {
