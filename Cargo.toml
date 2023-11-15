@@ -1,5 +1,7 @@
 [package]
 name = "quad-to-quad-transformer"
+description = "Translate 2d points from one quad to another"
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
