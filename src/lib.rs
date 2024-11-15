@@ -1,12 +1,14 @@
 use anyhow::anyhow;
-use log::warn;
+use log::{debug, warn};
 use na::{Matrix3, Point2};
 
 type Point2D = (f32, f32);
 
 extern crate nalgebra as na;
 
-// A standardised "1x1" box to transform all coordinates into
+/**
+A standardised "1x1 units" box to transform all coordinates into
+*/
 const DST_SIZE: f32 = 1.;
 pub const DEFAULT_DST_QUAD: RectCorners = [
     (0., 0.),
@@ -20,6 +22,7 @@ clockwise: 'left top', 'right top', 'right bottom', 'left bottom',
  */
 pub type RectCorners = [Point2D; 4];
 type Matrix8x8 = na::SMatrix<f32, 8, 8>;
+
 pub struct QuadTransformer {
     transform_matrix: Option<Matrix3<f32>>,
     ignore_outside_margin: Option<f32>,
@@ -31,8 +34,12 @@ impl QuadTransformer {
         ignore_outside_margin: Option<f32>,
     ) -> QuadTransformer {
         if ignore_outside_margin.is_none() {
-            warn!("perspectiveTransform.includeOutside was enabled; points will not be restricted to src_quad");
+            warn!("No outside margin value set; points will not be restricted to src_quad");
         }
+        if let Some(margin) = ignore_outside_margin {
+            warn!("An outside margin value was set; points further than {margin} distance outside of destination quad will be ignored");
+        }
+        // todo!();
         QuadTransformer {
             transform_matrix: src_quad
                 .map(|quad| build_transform(&quad.clone(), &DEFAULT_DST_QUAD)),
@@ -44,6 +51,8 @@ impl QuadTransformer {
         self.transform_matrix = Some(build_transform(src_quad, &DEFAULT_DST_QUAD));
     }
 
+    /** Take a single input point (within the source quad) and return the
+    transformed result (within the destination quad). */
     pub fn transform(&self, point: &Point2D) -> anyhow::Result<Point2D> {
         match self.transform_matrix {
             Some(matrix) => {
@@ -57,12 +66,15 @@ impl QuadTransformer {
         }
     }
 
-    pub fn get_tracked_points(&self, points: &[Point2D]) -> anyhow::Result<Vec<Point2D>> {
+    /** Using the `ignore_outside_margin` value (if set), return only the points that are
+    deemed to be "inside the destination quad". */
+    pub fn filter_points_inside(&self, points: &[Point2D]) -> anyhow::Result<Vec<Point2D>> {
         let points: Vec<Point2D> = points
             .iter()
             .filter(|point| match self.ignore_outside_margin {
                 Some(margin) => {
                     let (x, y) = point;
+                    debug!("...Is {x}, {y} outside of {margin}?");
                     !(*x > (DST_SIZE + margin)
                         || *x < (0. - margin)
                         || *y > (DST_SIZE + margin)
@@ -80,7 +92,7 @@ impl QuadTransformer {
     }
 }
 
-pub fn build_transform(src_quad: &RectCorners, dst_quad: &RectCorners) -> Matrix3<f32> {
+fn build_transform(src_quad: &RectCorners, dst_quad: &RectCorners) -> Matrix3<f32> {
     // Mappings by row - each should have 8 terms
 
     let r1: [f32; 8] = [
