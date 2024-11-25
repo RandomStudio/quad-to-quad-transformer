@@ -2,7 +2,7 @@
 name = "quad-to-quad-transformer"
 description = "Translate 2d points from one quad to another"
 license = "MIT"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 repository = "https://github.com/RandomStudio/quad-to-quad-transformer"
 

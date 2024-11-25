@@ -26,11 +26,13 @@ type Matrix8x8 = na::SMatrix<f32, 8, 8>;
 pub struct QuadTransformer {
     transform_matrix: Option<Matrix3<f32>>,
     ignore_outside_margin: Option<f32>,
+    dst_quad: Option<RectCorners>,
 }
 
 impl QuadTransformer {
     pub fn new(
         src_quad: Option<RectCorners>,
+        dst_quad: Option<RectCorners>,
         ignore_outside_margin: Option<f32>,
     ) -> QuadTransformer {
         if ignore_outside_margin.is_none() {
@@ -39,16 +41,27 @@ impl QuadTransformer {
         if let Some(margin) = ignore_outside_margin {
             warn!("An outside margin value was set; points further than {margin} distance outside of destination quad will be ignored");
         }
-        // todo!();
+        let useable_dst_quad: RectCorners = match dst_quad {
+            Some(q) => q,
+            None => DEFAULT_DST_QUAD,
+        };
         QuadTransformer {
             transform_matrix: src_quad
-                .map(|quad| build_transform(&quad.clone(), &DEFAULT_DST_QUAD)),
+                .map(|quad| build_transform(&quad.clone(), &useable_dst_quad)),
+            dst_quad,
             ignore_outside_margin,
         }
     }
 
-    pub fn set_new_quad(&mut self, src_quad: &RectCorners) {
-        self.transform_matrix = Some(build_transform(src_quad, &DEFAULT_DST_QUAD));
+    pub fn set_new_quad(&mut self, src_quad: &RectCorners, dst_quad: Option<RectCorners>) {
+        let useable_dst_quad: RectCorners = match dst_quad {
+            Some(q) => q,
+            None => DEFAULT_DST_QUAD,
+        };
+
+        self.dst_quad = dst_quad;
+
+        self.transform_matrix = Some(build_transform(src_quad, &useable_dst_quad));
     }
 
     /** Take a single input point (within the source quad) and return the
@@ -75,10 +88,21 @@ impl QuadTransformer {
                 Some(margin) => {
                     let (x, y) = point;
                     debug!("...Is {x}, {y} outside of {margin}?");
-                    !(*x > (DST_SIZE + margin)
-                        || *x < (0. - margin)
-                        || *y > (DST_SIZE + margin)
-                        || *y < (0. - margin))
+                    if let Some(dst_quad) = self.dst_quad {
+                        let [a, b, c, d] = dst_quad;
+                        let d_width = distance(a.0, a.1, b.0, b.1);
+                        let d_height = distance(a.0, a.1, d.0, d.1);
+                        !(*x > (d_width + margin)
+                            || *x < (0. - margin)
+                            || *y > (d_height + margin)
+                            || *y < (0. - margin))
+                    } else {
+                        // No destination quad set; use "default" [0;1]
+                        !(*x > (DST_SIZE + margin)
+                            || *x < (0. - margin)
+                            || *y > (DST_SIZE + margin)
+                            || *y < (0. - margin))
+                    }
                 }
                 None => true,
             })
@@ -90,6 +114,10 @@ impl QuadTransformer {
     pub fn is_ready(&self) -> bool {
         self.transform_matrix.is_some()
     }
+}
+
+fn distance(x1: f32, y1: f32, x2: f32, y2: f32) -> f32 {
+    ((x2 - x1).powf(2.0) + (y2 - y1).powf(2.0)).sqrt()
 }
 
 fn build_transform(src_quad: &RectCorners, dst_quad: &RectCorners) -> Matrix3<f32> {
