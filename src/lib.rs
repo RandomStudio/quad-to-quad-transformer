@@ -81,34 +81,16 @@ impl QuadTransformer {
 
     /** Using the `ignore_outside_margin` value (if set), return only the points that are
     deemed to be "inside the destination quad". */
-    pub fn filter_points_inside(&self, points: &[Point2D]) -> anyhow::Result<Vec<Point2D>> {
+    pub fn filter_points_inside(&self, points: &[Point2D]) -> Vec<Point2D> {
         let points: Vec<Point2D> = points
             .iter()
             .filter(|point| match self.ignore_outside_margin {
-                Some(margin) => {
-                    let (x, y) = point;
-                    debug!("...Is {x}, {y} outside of {margin}?");
-                    if let Some(dst_quad) = self.dst_quad {
-                        let [a, b, c, d] = dst_quad;
-                        let d_width = distance(a.0, a.1, b.0, b.1);
-                        let d_height = distance(a.0, a.1, d.0, d.1);
-                        !(*x > (d_width + margin)
-                            || *x < (0. - margin)
-                            || *y > (d_height + margin)
-                            || *y < (0. - margin))
-                    } else {
-                        // No destination quad set; use "default" [0;1]
-                        !(*x > (DST_SIZE + margin)
-                            || *x < (0. - margin)
-                            || *y > (DST_SIZE + margin)
-                            || *y < (0. - margin))
-                    }
-                }
+                Some(margin) => point_is_inside_quad(point, self.dst_quad, margin),
                 None => true,
             })
             .map(|p| (p.0, p.1))
             .collect();
-        Ok(points)
+        points
     }
 
     pub fn is_ready(&self) -> bool {
@@ -116,8 +98,19 @@ impl QuadTransformer {
     }
 }
 
-fn distance(x1: f32, y1: f32, x2: f32, y2: f32) -> f32 {
-    ((x2 - x1).powf(2.0) + (y2 - y1).powf(2.0)).sqrt()
+fn point_is_inside_quad(point: &Point2D, dst_quad: Option<RectCorners>, margin: f32) -> bool {
+    let (x, y) = point;
+    debug!("...Is {x}, {y} outside of {margin}?");
+    if let Some(dst_quad) = dst_quad {
+        let [a, b, _c, d] = dst_quad;
+        *x >= (a.0 - margin) && *x <= (b.0 + margin) && *y >= (a.1 - margin) && *y <= (d.1 + margin)
+    } else {
+        // No destination quad set; use "default" [0;1]
+        *x >= (0. - margin)
+            && *x <= (DST_SIZE + margin)
+            && *y >= (0. - margin)
+            && *y <= (DST_SIZE + margin)
+    }
 }
 
 fn build_transform(src_quad: &RectCorners, dst_quad: &RectCorners) -> Matrix3<f32> {
@@ -314,5 +307,65 @@ mod tests {
         };
 
         assert_eq!(result, (2., 3.));
+    }
+
+    #[test]
+    fn test_inside_standard_quad() {
+        let point: Point2D = (0.5, 0.5);
+        assert!(point_is_inside_quad(&point, None, 0.));
+
+        // Outside
+        let point: Point2D = (-0.5, 0.5);
+        assert!(!point_is_inside_quad(&point, None, 0.));
+
+        // Right on the edge
+        let point: Point2D = (1.0, 1.0);
+        assert!(point_is_inside_quad(&point, None, 0.));
+    }
+
+    #[test]
+    fn test_inside_dst_quad() {
+        let centered_dst_quad: RectCorners =
+            [(-100., -100.), (100., -100.), (100., 100.), (-100., 100.)];
+
+        // Inside
+        let point: Point2D = (0., 0.);
+        assert!(point_is_inside_quad(&point, Some(centered_dst_quad), 0.));
+
+        // Outside
+        let point: Point2D = (101., 0.);
+        assert!(!point_is_inside_quad(&point, Some(centered_dst_quad), 0.));
+
+
+        // Right on the edge
+        let point: Point2D = (100., 0.);
+        assert!(point_is_inside_quad(&point, Some(centered_dst_quad), 0.));
+    }
+
+    #[test]
+    fn test_inside_with_margin_standard_quad() {
+        // 0.1 outside, but margin is 0.25, so ACCEPTED
+        let point: Point2D = (1.1, 0.);
+        assert!(point_is_inside_quad(&point, None, 0.25));
+
+        // 0.5 ouside, and margin is 0.25, so REJECTED
+        let point: Point2D = (1.5, 0.);
+        assert!(!point_is_inside_quad(&point, None, 0.25));
+
+    }
+
+    #[test]
+    fn test_inside_with_margin_dst_quad() {
+        let centered_dst_quad: RectCorners =
+            [(-100., -100.), (100., -100.), (100., 100.), (-100., 100.)];
+
+        // 1 outside, but margin is 10, so ACCEPTED
+        let point: Point2D = (101., 0.);
+        assert!(point_is_inside_quad(&point, Some(centered_dst_quad), 10.0));
+
+        // 15 ouside, and margin is 10, so REJECTED
+        let point: Point2D = (115., 0.);
+        assert!(!point_is_inside_quad(&point, Some(centered_dst_quad), 10.0));
+
     }
 }
