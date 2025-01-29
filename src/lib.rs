@@ -240,6 +240,7 @@ mod tests {
     use super::RectCorners;
 
     #[test]
+    #[allow(clippy::excessive_precision)]
     fn test_get_transform_matrix() {
         // numbers as per https://github.com/jlouthan/perspective-transform#basic-usage
 
@@ -270,7 +271,6 @@ mod tests {
             let transformed = transform_matrix.transform_point(&nalgebra_point);
             (transformed.x, transformed.y)
         };
-
         assert_eq!(
             (result.0.round(), result.1.round()),
             (
@@ -336,7 +336,6 @@ mod tests {
         let point: Point2D = (101., 0.);
         assert!(!point_is_inside_quad(&point, Some(centered_dst_quad), 0.));
 
-
         // Right on the edge
         let point: Point2D = (100., 0.);
         assert!(point_is_inside_quad(&point, Some(centered_dst_quad), 0.));
@@ -351,7 +350,6 @@ mod tests {
         // 0.5 ouside, and margin is 0.25, so REJECTED
         let point: Point2D = (1.5, 0.);
         assert!(!point_is_inside_quad(&point, None, 0.25));
-
     }
 
     #[test]
@@ -366,6 +364,5 @@ mod tests {
         // 15 ouside, and margin is 10, so REJECTED
         let point: Point2D = (115., 0.);
         assert!(!point_is_inside_quad(&point, Some(centered_dst_quad), 10.0));
-
     }
 }
